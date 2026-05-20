@@ -75,15 +75,15 @@ The project follows a strict aesthetic specification:
 
 ## 🛠️ Technology Stack
 
-```
+```mermaid
 graph TD
     A[Gravity Simulation] --> B[Vite 6]
     A --> C[React 19]
     A --> D[TypeScript 5]
     A --> E[Three.js]
-    A --> F[@react-three/fiber]
-    A --> G[@react-three/drei]
-    A --> H[@react-three/rapier]
+    A --> F[react-three/fiber]
+    A --> G[react-three/drei]
+    A --> H[react-three/rapier]
     A --> I[dockview-react]
     A --> J[Zustand]
     A --> K[Lever]
