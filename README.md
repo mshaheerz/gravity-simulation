@@ -75,7 +75,7 @@ The project follows a strict aesthetic specification:
 
 ## 🛠️ Technology Stack
 
-```mermaid
+```
 graph TD
     A[Gravity Simulation] --> B[Vite 6]
     A --> C[React 19]
