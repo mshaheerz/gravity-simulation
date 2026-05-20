@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --nasa-bg: #000000;
+  --nasa-panel: #0a0e0a;
+  --nasa-border: #1a3a1a;
+  --nasa-text: #b8ffb8;
+  --nasa-accent: #00ff66;
+  --nasa-warn: #ffb800;
+  --nasa-danger: #ff3030;
+  --nasa-grid: #0f1f0f;
+  --nasa-dim: #3a6a3a;
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: var(--nasa-bg);
+  color: var(--nasa-text);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  overflow: hidden;
+}
+
+::selection {
+  background: var(--nasa-accent);
+  color: var(--nasa-bg);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--nasa-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--nasa-border);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--nasa-dim);
+}
+
+.phosphor-glow {
+  text-shadow: 0 0 6px rgba(0, 255, 102, 0.55);
+}
+
+.panel-title {
+  color: var(--nasa-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 500;
+}
+
+.nasa-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: var(--nasa-grid);
+  border: 1px solid var(--nasa-border);
+  outline: none;
+}
+.nasa-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 14px;
+  background: var(--nasa-accent);
+  border: 0;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(0, 255, 102, 0.55);
+}
+.nasa-range::-moz-range-thumb {
+  width: 10px;
+  height: 14px;
+  background: var(--nasa-accent);
+  border: 0;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(0, 255, 102, 0.55);
+}
+
+input[type='color'] {
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 0;
+}
+input[type='color']::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+input[type='color']::-webkit-color-swatch {
+  border: 0;
+}
+
+.scanlines::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 255, 102, 0.025) 3px,
+    rgba(0, 0, 0, 0) 4px
+  );
+  z-index: 9999;
+}
