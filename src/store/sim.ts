@@ -4,6 +4,8 @@ import type { ThemeId } from '../sim/themes'
 
 export type ViewMode = 'space' | 'surface'
 
+export type MapId = 'grasslands' | 'desert' | 'snow' | 'mars'
+
 export type WorldPresetId = 'earth' | 'moon' | 'mars' | 'jupiter' | 'zerog'
 
 export interface WorldPreset {
@@ -14,6 +16,24 @@ export interface WorldPreset {
   vacuum: boolean
   description: string
 }
+
+export interface MapPreset {
+  id: MapId
+  label: string
+  terrainColor: string
+  description: string
+}
+
+export const MAP_PRESETS: MapPreset[] = [
+  { id: 'grasslands', label: 'GRASSLANDS', terrainColor: '#5c544a', description: 'Green grassy terrain' },
+  { id: 'desert', label: 'DESERT', terrainColor: '#c29a5b', description: 'Sandy desert terrain' },
+  { id: 'snow', label: 'SNOW', terrainColor: '#e8e8e8', description: 'Snowy white terrain' },
+  { id: 'mars', label: 'MARS', terrainColor: '#994d22', description: 'Red Martian terrain' },
+]
+
+export const MAP_PRESETS_BY_ID: Record<MapId, MapPreset> = Object.fromEntries(
+  MAP_PRESETS.map((m) => [m.id, m]),
+) as Record<MapId, MapPreset>
 
 export const WORLD_PRESETS: WorldPreset[] = [
   { id: 'earth',   label: 'EARTH',   gravity: 9.81,  airDensity: 1.225, vacuum: false, description: 'Sea level, standard atmosphere' },
@@ -42,6 +62,10 @@ export interface Body {
   linearDamping?: number
   color?: string
   label?: string
+  gravityEnabled?: boolean
+  fixed?: boolean
+  terrain?: boolean
+  scale?: number
   // bumped to force a Rapier remount when physical attributes change
   remountNonce: number
 }
@@ -52,6 +76,31 @@ export interface SimState {
 
   theme: ThemeId
   setTheme: (themeId: ThemeId) => void
+
+  defaultTerrain: boolean
+  setDefaultTerrain: (v: boolean) => void
+
+  map: MapId
+  setMap: (m: MapId) => void
+
+  dayNight: 'day' | 'night'
+  setDayNight: (m: 'day' | 'night') => void
+
+  volumetricClouds: boolean
+  setVolumetricClouds: (v: boolean) => void
+
+  cameraMode: 'orbit' | 'free' | 'fpp' | 'tpp'
+  setCameraMode: (m: 'orbit' | 'free' | 'fpp' | 'tpp') => void
+
+  gameMode: boolean
+  setGameMode: (v: boolean) => void
+
+  spawnPoint: [number, number, number]
+  setSpawnPoint: (p: [number, number, number]) => void
+
+  cameraState: { pos: [number, number, number]; target: [number, number, number] }
+  setCameraState: (s: { pos: [number, number, number]; target: [number, number, number] }) => void
+  resetCamera: () => void
 
   gravity: number
   vacuum: boolean
@@ -107,14 +156,39 @@ export function reserveIds(ids: string[]) {
 }
 
 const seedSurface = (): Body[] => [
-  { id: nextId(), presetId: 'sphere', pos: [0, 8, 0], vel: [0, 0, 0], remountNonce: 0 },
-  { id: nextId(), presetId: 'cube', pos: [1.6, 12, 0], vel: [0, 0, 0], remountNonce: 0 },
-  { id: nextId(), presetId: 'cannonball', pos: [-1.6, 10, 1], vel: [0, 0, 0], remountNonce: 0 },
+  { id: nextId(), presetId: 'sphere', pos: [0, 8, 0], vel: [0, 0, 0], gravityEnabled: true, scale: 0.5, remountNonce: 0 },
+  { id: nextId(), presetId: 'cube', pos: [1.6, 12, 0], vel: [0, 0, 0], gravityEnabled: true, scale: 0.5, remountNonce: 0 },
+  { id: nextId(), presetId: 'cannonball', pos: [-1.6, 10, 1], vel: [0, 0, 0], gravityEnabled: true, scale: 0.5, remountNonce: 0 },
 ]
 
 export const useSim = create<SimState>((set) => ({
   theme: 'default',
   setTheme: (theme) => set({ theme }),
+
+  defaultTerrain: true,
+  setDefaultTerrain: (v) => set({ defaultTerrain: v }),
+
+  map: 'grasslands',
+  setMap: (m) => set({ map: m }),
+
+  dayNight: 'day',
+  setDayNight: (m) => set({ dayNight: m }),
+
+  volumetricClouds: false,
+  setVolumetricClouds: (v) => set({ volumetricClouds: v }),
+
+  cameraMode: 'orbit',
+  setCameraMode: (m) => set({ cameraMode: m }),
+
+  gameMode: false,
+  setGameMode: (v) => set({ gameMode: v }),
+
+  spawnPoint: [0, 8, 0],
+  setSpawnPoint: (p) => set({ spawnPoint: p }),
+
+  cameraState: { pos: [15, 15 * 0.6, 15], target: [0, 0, 0] },
+  setCameraState: (s) => set({ cameraState: s }),
+  resetCamera: () => set({ cameraState: { pos: [15, 15 * 0.6, 15], target: [0, 0, 0] } }),
 
   viewMode: 'surface',
   setViewMode: (m) => set({ viewMode: m }),
@@ -154,14 +228,15 @@ export const useSim = create<SimState>((set) => ({
       if (!preset) return ''
     }
     const id = nextId()
+    const spawnPoint = useSim.getState().spawnPoint
     const body: Body = {
       id,
       presetId,
       customAssetId: opts?.customAssetId,
       pos: opts?.pos ?? [
-        (Math.random() - 0.5) * 4,
-        8 + Math.random() * 6,
-        (Math.random() - 0.5) * 4,
+        spawnPoint[0] + (Math.random() - 0.5) * 2,
+        spawnPoint[1],
+        spawnPoint[2] + (Math.random() - 0.5) * 2,
       ],
       vel: opts?.vel ?? [0, 0, 0],
       mass: opts?.mass,
@@ -170,6 +245,10 @@ export const useSim = create<SimState>((set) => ({
       linearDamping: opts?.linearDamping,
       color: opts?.color,
       label: opts?.label,
+      gravityEnabled: opts?.gravityEnabled ?? true,
+      fixed: opts?.fixed ?? false,
+      terrain: opts?.terrain ?? false,
+      scale: opts?.scale ?? (presetId === 'custom' ? 1 : 0.5),
       remountNonce: 0,
     }
     set((s) => ({ bodies: [...s.bodies, body], selectedId: id }))

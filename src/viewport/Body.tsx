@@ -54,6 +54,7 @@ export function Body({ body }: { body: BodyData }) {
     }
   }, [linearDamping])
 
+  const scaleMultiplier = body.scale ?? 1
   if (!preset) return null
 
   const onClick = (e: any) => {
@@ -63,8 +64,8 @@ export function Body({ body }: { body: BodyData }) {
 
   const selectionRing = isSelected && (
     <mesh rotation={[Math.PI / 2, 0, 0]}>
-      <ringGeometry args={[selectionRadius(preset.shape, preset.dims) + 0.08, selectionRadius(preset.shape, preset.dims) + 0.14, 64]} />
-      <meshBasicMaterial color={colors.accent} side={THREE.DoubleSide} transparent opacity={0.9} depthTest={false} />
+      <ringGeometry args={[selectionRadius(preset.shape, preset.dims) * scaleMultiplier + 0.08, selectionRadius(preset.shape, preset.dims) * scaleMultiplier + 0.14, 64]} />
+      <meshBasicMaterial color={body.terrain ? '#f59e0b' : colors.accent} side={THREE.DoubleSide} transparent opacity={0.9} depthTest={false} />
     </mesh>
   )
 
@@ -83,18 +84,20 @@ export function Body({ body }: { body: BodyData }) {
       rbRef.current = rb
       bodyRefs.set(body.id, rb)
     },
+    type: body.fixed ? 'fixed' : 'dynamic',
     position: body.pos,
-    linearVelocity: body.vel,
+    linearVelocity: (body.fixed ? [0, 0, 0] : body.vel) as [number, number, number],
     restitution,
     friction,
     linearDamping,
     angularDamping: 0.05,
+    gravityScale: body.gravityEnabled ?? true ? 1 : 0,
     onClick,
     onCollisionEnter,
   } as const
 
   if (preset.shape === 'sphere') {
-    const r = preset.dims[0]
+    const r = preset.dims[0] * scaleMultiplier
     return (
       <RigidBody {...commonRB} colliders={false}>
         <BallCollider args={[r]} mass={mass} />
@@ -114,7 +117,7 @@ export function Body({ body }: { body: BodyData }) {
   }
 
   if (preset.shape === 'cuboid') {
-    const [hx, hy, hz] = preset.dims
+    const [hx, hy, hz] = preset.dims.map(d => d * scaleMultiplier)
     return (
       <RigidBody {...commonRB} colliders={false}>
         <CuboidCollider args={[hx, hy, hz]} mass={mass} />
@@ -134,7 +137,7 @@ export function Body({ body }: { body: BodyData }) {
   }
 
   if (preset.shape === 'capsule') {
-    const [r, h] = preset.dims
+    const [r, h] = preset.dims.map(d => d * scaleMultiplier)
     return (
       <RigidBody {...commonRB} colliders={false}>
         <CapsuleCollider args={[h, r]} mass={mass} />
@@ -154,7 +157,7 @@ export function Body({ body }: { body: BodyData }) {
   }
 
   if (preset.shape === 'cone') {
-    const [r, h] = preset.dims
+    const [r, h] = preset.dims.map(d => d * scaleMultiplier)
     return (
       <RigidBody {...commonRB} colliders={false}>
         <ConeCollider args={[h, r]} mass={mass} />

@@ -17,14 +17,14 @@ import { useThemeColors } from '../sim/useThemeColors'
  * sprite, also wrapped in a sphere collider.
  */
 
-const SelectionRing = ({ radius, accent }: { radius: number; accent: string }) => (
+const SelectionRing = ({ radius, accent, isTerrain }: { radius: number; accent: string; isTerrain?: boolean }) => (
   <mesh rotation={[Math.PI / 2, 0, 0]}>
     <ringGeometry args={[radius + 0.08, radius + 0.14, 64]} />
-    <meshBasicMaterial color={accent} side={THREE.DoubleSide} transparent opacity={0.9} depthTest={false} />
+    <meshBasicMaterial color={isTerrain ? '#f59e0b' : accent} side={THREE.DoubleSide} transparent opacity={0.9} depthTest={false} />
   </mesh>
 )
 
-function GltfVisual({ url, targetRadius }: { url: string; targetRadius: number }) {
+function GltfVisual({ url, targetRadius, scaleMultiplier, isTerrain }: { url: string; targetRadius: number; scaleMultiplier?: number; isTerrain?: boolean }) {
   const gltf = useGLTF(url)
   // Auto-scale so the longest bounding-sphere axis matches the target radius.
   const { scale, scene } = useMemo(() => {
@@ -33,16 +33,21 @@ function GltfVisual({ url, targetRadius }: { url: string; targetRadius: number }
     const sphere = new THREE.Sphere()
     box.getBoundingSphere(sphere)
     const factor = sphere.radius > 0 ? targetRadius / sphere.radius : 1
-    // Re-center on origin so the body's rigid body anchor matches the visual.
+    const finalScale = factor * (scaleMultiplier ?? 1)
+    // Re-center on origin or place on ground for terrain
     const center = new THREE.Vector3()
     box.getCenter(center)
     cloned.position.sub(center)
-    return { scale: factor, scene: cloned }
-  }, [gltf, targetRadius])
+    if (isTerrain) {
+      const minY = box.min.y - center.y
+      cloned.position.y -= minY * finalScale
+    }
+    return { scale: finalScale, scene: cloned }
+  }, [gltf, targetRadius, scaleMultiplier, isTerrain])
   return <primitive object={scene} scale={scale} />
 }
 
-function ObjVisual({ url, targetRadius, color }: { url: string; targetRadius: number; color: string }) {
+function ObjVisual({ url, targetRadius, color, scaleMultiplier, isTerrain }: { url: string; targetRadius: number; color: string; scaleMultiplier?: number; isTerrain?: boolean }) {
   const obj = useLoader(OBJLoader, url)
   const { scale, scene } = useMemo(() => {
     const cloned = obj.clone(true)
@@ -59,21 +64,26 @@ function ObjVisual({ url, targetRadius, color }: { url: string; targetRadius: nu
     const sphere = new THREE.Sphere()
     box.getBoundingSphere(sphere)
     const factor = sphere.radius > 0 ? targetRadius / sphere.radius : 1
+    const finalScale = factor * (scaleMultiplier ?? 1)
     const center = new THREE.Vector3()
     box.getCenter(center)
     cloned.position.sub(center)
-    return { scale: factor, scene: cloned }
-  }, [obj, targetRadius, color])
+    if (isTerrain) {
+      const minY = box.min.y - center.y
+      cloned.position.y -= minY * finalScale
+    }
+    return { scale: finalScale, scene: cloned }
+  }, [obj, targetRadius, color, scaleMultiplier, isTerrain])
   return <primitive object={scene} scale={scale} />
 }
 
-function ImageVisual({ url, targetRadius }: { url: string; targetRadius: number }) {
+function ImageVisual({ url, targetRadius, scaleMultiplier }: { url: string; targetRadius: number; scaleMultiplier?: number }) {
   const tex = useTexture(url) as THREE.Texture
   // tex.image is HTMLImageElement|ImageBitmap depending on loader path — typed
   // loosely by drei. Cast for aspect math; default to 1:1 if unavailable.
   const img = tex.image as { width?: number; height?: number } | undefined
   const aspect = (img?.width ?? 1) / (img?.height ?? 1) || 1
-  const w = targetRadius * 2
+  const w = targetRadius * 2 * (scaleMultiplier ?? 1)
   const h = w / aspect
   return (
     <sprite scale={[w, h, 1]}>
@@ -127,14 +137,16 @@ export function CustomBody({ body }: { body: BodyData }) {
 
   // If the asset went missing (e.g. user removed it from the library), render
   // a wireframe stand-in so physics still works.
+  const scaleMultiplier = body.scale ?? 1
+  const isTerrain = body.terrain ?? false
   const visual = !asset ? (
-    <VisualFallback radius={radius} border={colors.border} />
+    <VisualFallback radius={radius * scaleMultiplier} border={colors.border} />
   ) : asset.kind === 'gltf' ? (
-    <GltfVisual url={asset.url} targetRadius={radius} />
+    <GltfVisual url={asset.url} targetRadius={radius} scaleMultiplier={scaleMultiplier} isTerrain={isTerrain} />
   ) : asset.kind === 'obj' ? (
-    <ObjVisual url={asset.url} targetRadius={radius} color={color} />
+    <ObjVisual url={asset.url} targetRadius={radius} color={color} scaleMultiplier={scaleMultiplier} isTerrain={isTerrain} />
   ) : (
-    <ImageVisual url={asset.url} targetRadius={radius} />
+    <ImageVisual url={asset.url} targetRadius={radius} scaleMultiplier={scaleMultiplier} />
   )
 
   const onClick = (e: any) => {
@@ -155,8 +167,9 @@ export function CustomBody({ body }: { body: BodyData }) {
         rbRef.current = rb
         bodyRefs.set(body.id, rb)
       }}
+      type={body.fixed ? 'fixed' : 'dynamic'}
       position={body.pos}
-      linearVelocity={body.vel}
+      linearVelocity={(body.fixed ? [0, 0, 0] : body.vel) as [number, number, number]}
       restitution={restitution}
       friction={friction}
       linearDamping={linearDamping}
@@ -164,13 +177,13 @@ export function CustomBody({ body }: { body: BodyData }) {
       colliders={false}
       onCollisionEnter={onCollisionEnter}
     >
-      <BallCollider args={[radius]} mass={mass} />
+      <BallCollider args={[radius * scaleMultiplier]} mass={mass} />
       {/* Click target lives on the visual group so we avoid relying on
           RigidBody's prop-forwarding (the types don't surface onClick). */}
       <group onClick={onClick}>
-        <Suspense fallback={<VisualFallback radius={radius} border={colors.border} />}>{visual}</Suspense>
+        <Suspense fallback={<VisualFallback radius={radius * scaleMultiplier} border={colors.border} />}>{visual}</Suspense>
       </group>
-      {isSelected && <SelectionRing radius={radius} accent={colors.accent} />}
+      {isSelected && <SelectionRing radius={radius * scaleMultiplier} accent={colors.accent} isTerrain={body.terrain} />}
     </RigidBody>
   )
 }

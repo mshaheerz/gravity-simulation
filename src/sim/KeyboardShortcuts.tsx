@@ -34,6 +34,7 @@ export function KeyboardShortcuts() {
       const s = useSim.getState()
       switch (e.key) {
         case ' ': {
+          if (s.gameMode) return
           e.preventDefault()
           s.setPaused(!s.paused)
           break

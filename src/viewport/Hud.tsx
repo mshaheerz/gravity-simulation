@@ -10,6 +10,14 @@ export function ViewportHud() {
   const bumpReset = useSim((s) => s.bumpReset)
   const gravity = useSim((s) => s.gravity)
   const bodyCount = useSim((s) => s.bodies.length)
+  const volumetricClouds = useSim((s) => s.volumetricClouds)
+  const setVolumetricClouds = useSim((s) => s.setVolumetricClouds)
+  const dayNight = useSim((s) => s.dayNight)
+  const setDayNight = useSim((s) => s.setDayNight)
+  const cameraMode = useSim((s) => s.cameraMode)
+  const setCameraMode = useSim((s) => s.setCameraMode)
+  const gameMode = useSim((s) => s.gameMode)
+  const setGameMode = useSim((s) => s.setGameMode)
 
   // Mission clock — poll the store at 10 Hz so the HUD doesn't re-render on
   // every rAF tick. Spec calls for `T+00:00:12.345` top-right.
@@ -66,6 +74,44 @@ export function ViewportHud() {
           [ MODE: {viewMode === 'surface' ? 'SURFACE' : 'SPACE'} ]
         </button>
         <button
+          onClick={() => {
+            if (cameraMode === 'orbit') setCameraMode('free')
+            else if (cameraMode === 'free') setCameraMode('fpp')
+            else if (cameraMode === 'fpp') setCameraMode('tpp')
+            else setCameraMode('orbit')
+          }}
+          className={
+            'border px-2 py-0.5 transition ' +
+            (cameraMode !== 'orbit'
+              ? 'border-nasa-accent text-nasa-accent hover:bg-nasa-accent/10'
+              : 'border-nasa-border text-nasa-text hover:border-nasa-accent hover:bg-nasa-border/30')
+          }
+        >
+          [ {cameraMode.toUpperCase()} ]
+        </button>
+        <button
+          onClick={() => setGameMode(!gameMode)}
+          className={
+            'border px-2 py-0.5 transition ' +
+            (gameMode
+              ? 'border-nasa-accent text-nasa-accent hover:bg-nasa-accent/10'
+              : 'border-nasa-border text-nasa-text hover:border-nasa-accent hover:bg-nasa-border/30')
+          }
+        >
+          [ GAME: {gameMode ? 'ON' : 'OFF'} ]
+        </button>
+        <button
+          onClick={() => setDayNight(dayNight === 'day' ? 'night' : 'day')}
+          className={
+            'border px-2 py-0.5 transition ' +
+            (dayNight === 'day'
+              ? 'border-nasa-accent text-nasa-accent hover:bg-nasa-accent/10'
+              : 'border-nasa-border text-nasa-text hover:border-nasa-accent hover:bg-nasa-border/30')
+          }
+        >
+          [ {dayNight.toUpperCase()} ]
+        </button>
+        <button
           onClick={() => setPaused(!paused)}
           className={
             'border px-2 py-0.5 transition ' +
@@ -75,6 +121,17 @@ export function ViewportHud() {
           }
         >
           [ {paused ? 'PAUSED' : 'RUNNING'} ]
+        </button>
+        <button
+          onClick={() => setVolumetricClouds(!volumetricClouds)}
+          className={
+            'border px-2 py-0.5 transition ' +
+            (volumetricClouds
+              ? 'border-nasa-accent text-nasa-accent hover:bg-nasa-accent/10'
+              : 'border-nasa-border text-nasa-text hover:border-nasa-accent hover:bg-nasa-border/30')
+          }
+        >
+          [ CLOUDS: {volumetricClouds ? 'ON' : 'OFF'} ]
         </button>
         <button
           onClick={() => bumpReset()}

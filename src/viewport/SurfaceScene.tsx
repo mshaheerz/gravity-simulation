@@ -1,5 +1,5 @@
 import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier'
-import { useSim } from '../store/sim'
+import { useSim, MAP_PRESETS_BY_ID, type MapId } from '../store/sim'
 import { useEffect, useMemo, useState } from 'react'
 import { Body } from './Body'
 import * as THREE from 'three'
@@ -12,9 +12,15 @@ function seeded(seed: number) {
   }
 }
 
-function createTerrainTexture() {
+function createTerrainTexture(mapId: MapId) {
+  const map = MAP_PRESETS_BY_ID[mapId]
+  
   if (typeof document === 'undefined') {
-    const data = new Uint8Array([92, 84, 74, 255])
+    const hex = map.terrainColor.replace('#', '')
+    const r = parseInt(hex.substring(0, 2), 16)
+    const g = parseInt(hex.substring(2, 4), 16)
+    const b = parseInt(hex.substring(4, 6), 16)
+    const data = new Uint8Array([r, g, b, 255])
     const tex = new THREE.DataTexture(data, 1, 1)
     tex.needsUpdate = true
     tex.colorSpace = THREE.SRGBColorSpace
@@ -30,7 +36,11 @@ function createTerrainTexture() {
   canvas.height = size
   const ctx = canvas.getContext('2d')
   if (!ctx) {
-    const data = new Uint8Array([92, 84, 74, 255])
+    const hex = map.terrainColor.replace('#', '')
+    const r = parseInt(hex.substring(0, 2), 16)
+    const g = parseInt(hex.substring(2, 4), 16)
+    const b = parseInt(hex.substring(4, 6), 16)
+    const data = new Uint8Array([r, g, b, 255])
     const tex = new THREE.DataTexture(data, 1, 1)
     tex.needsUpdate = true
     tex.colorSpace = THREE.SRGBColorSpace
@@ -42,7 +52,7 @@ function createTerrainTexture() {
 
   const rand = seeded(20260522)
 
-  ctx.fillStyle = '#5c544a'
+  ctx.fillStyle = map.terrainColor
   ctx.fillRect(0, 0, size, size)
 
   // Tile/stone seams.
@@ -107,8 +117,8 @@ function createTerrainTexture() {
   return texture
 }
 
-function TerrainVisual() {
-  const terrainMap = useMemo(() => createTerrainTexture(), [])
+function TerrainVisual({ mapId }: { mapId: MapId }) {
+  const terrainMap = useMemo(() => createTerrainTexture(mapId), [mapId])
   const deco = useMemo(() => {
     const rand = seeded(71)
     const puddles = Array.from({ length: 10 }, () => ({
@@ -165,45 +175,12 @@ function TerrainVisual() {
   )
 }
 
-function DayClouds() {
-  const clouds = useMemo(() => {
-    const rand = seeded(807)
-    return Array.from({ length: 16 }, (_, i) => ({
-      id: i,
-      x: (rand() * 2 - 1) * 46,
-      y: 12 + rand() * 11,
-      z: (rand() * 2 - 1) * 46,
-      sx: 2 + rand() * 4.5,
-      sy: 0.8 + rand() * 1.6,
-      sz: 1.8 + rand() * 4.2,
-      r: rand() * Math.PI,
-      a: 0.42 + rand() * 0.28,
-    }))
-  }, [])
-
-  return (
-    <>
-      {clouds.map((c) => (
-        <group key={c.id} position={[c.x, c.y, c.z]} rotation={[0, c.r, 0]}>
-          <mesh scale={[c.sx, c.sy, c.sz]}>
-            <sphereGeometry args={[1, 18, 14]} />
-            <meshStandardMaterial color="#ffffff" transparent opacity={c.a} roughness={0.95} metalness={0} depthWrite={false} />
-          </mesh>
-          <mesh position={[0.9, 0.25, 0.4]} scale={[c.sx * 0.58, c.sy * 0.8, c.sz * 0.56]}>
-            <sphereGeometry args={[1, 14, 10]} />
-            <meshStandardMaterial color="#f2f7ff" transparent opacity={Math.min(0.75, c.a + 0.08)} roughness={0.95} metalness={0} depthWrite={false} />
-          </mesh>
-        </group>
-      ))}
-    </>
-  )
-}
-
 export function SurfaceScene() {
   const gravity = useSim((s) => s.gravity)
   const paused = useSim((s) => s.paused)
   const timeScale = useSim((s) => s.timeScale)
-  const theme = useSim((s) => s.theme)
+  const map = useSim((s) => s.map)
+  const defaultTerrain = useSim((s) => s.defaultTerrain)
   const resetNonce = useSim((s) => s.resetNonce)
   const stepNonce = useSim((s) => s.stepNonce)
   const bodies = useSim((s) => s.bodies)
@@ -231,20 +208,22 @@ export function SurfaceScene() {
   }, [stepNonce])
 
   const effectivelyPaused = paused && !stepping
-  const dayMode = theme === 'day'
 
   return (
     <Physics gravity={gravityVec} paused={effectivelyPaused} timeStep={timeStep} interpolate>
       <group onPointerMissed={() => selectBody(null)}>
-        <RigidBody type="fixed" colliders={false}>
-          <CuboidCollider args={[40, 0.5, 40]} position={[0, -0.5, 0]} />
-          <mesh receiveShadow position={[0, -0.5, 0]} visible={false}>
-            <boxGeometry args={[80, 1, 80]} />
-            <meshStandardMaterial color="#000000" />
-          </mesh>
-        </RigidBody>
-        <TerrainVisual />
-        {dayMode && <DayClouds />}
+        {defaultTerrain && (
+          <>
+            <RigidBody type="fixed" colliders={false}>
+              <CuboidCollider args={[40, 0.5, 40]} position={[0, -0.5, 0]} />
+              <mesh receiveShadow position={[0, -0.5, 0]} visible={false}>
+                <boxGeometry args={[80, 1, 80]} />
+                <meshStandardMaterial color="#000000" />
+              </mesh>
+            </RigidBody>
+            <TerrainVisual mapId={map} />
+          </>
+        )}
         {bodies.map((b) => (
           <Body key={`${b.id}-${b.remountNonce}-${resetNonce}`} body={b} />
         ))}

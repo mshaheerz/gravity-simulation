@@ -190,6 +190,84 @@ export function InspectorPanelEditable() {
             />
             <span className="text-nasa-text text-[10px]">{color.toUpperCase()}</span>
           </div>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-nasa-dim text-[11px]">GRAVITY</span>
+            <button
+              onClick={() => setPhysics({ gravityEnabled: !(body.gravityEnabled ?? true) })}
+              className={
+                'flex-1 border px-2 py-0.5 text-[10px] transition ' +
+                ((body.gravityEnabled ?? true)
+                  ? 'border-nasa-accent text-nasa-accent hover:bg-nasa-accent/10'
+                  : 'border-nasa-border text-nasa-text hover:border-nasa-accent hover:bg-nasa-border/30')
+              }
+            >
+              [ {body.gravityEnabled ?? true ? 'ON' : 'OFF'} ]
+            </button>
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-nasa-dim text-[11px]">FIXED</span>
+            <button
+              onClick={() => setPhysics({ fixed: !(body.fixed ?? false) })}
+              className={
+                'flex-1 border px-2 py-0.5 text-[10px] transition ' +
+                ((body.fixed ?? false)
+                  ? 'border-nasa-accent text-nasa-accent hover:bg-nasa-accent/10'
+                  : 'border-nasa-border text-nasa-text hover:border-nasa-accent hover:bg-nasa-border/30')
+              }
+            >
+              [ {body.fixed ?? false ? 'ON' : 'OFF'} ]
+            </button>
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-nasa-dim text-[11px]">TERRAIN</span>
+            <button
+              onClick={() => setPhysics({ terrain: !(body.terrain ?? false) })}
+              className={
+                'flex-1 border px-2 py-0.5 text-[10px] transition ' +
+                ((body.terrain ?? false)
+                  ? 'border-nasa-warn text-nasa-warn hover:bg-nasa-warn/10'
+                  : 'border-nasa-border text-nasa-text hover:border-nasa-warn hover:bg-nasa-border/30')
+              }
+            >
+              [ {body.terrain ?? false ? 'YES' : 'NO'} ]
+            </button>
+          </div>
+          <div className="mt-1">
+            <Slider
+              label="SCALE"
+              value={body.scale ?? 1}
+              min={0.1}
+              max={100}
+              step={0.1}
+              onChange={(v) => setPhysics({ scale: v })}
+            />
+            <div className="flex gap-1 mt-1">
+              <button
+                onClick={() => setPhysics({ scale: 1 })}
+                className="flex-1 border border-nasa-border hover:border-nasa-accent hover:bg-nasa-border/30 text-nasa-text px-1 py-0.5 text-[10px] transition"
+              >
+                ×1
+              </button>
+              <button
+                onClick={() => setPhysics({ scale: (body.scale ?? 1) * 2 })}
+                className="flex-1 border border-nasa-border hover:border-nasa-accent hover:bg-nasa-border/30 text-nasa-text px-1 py-0.5 text-[10px] transition"
+              >
+                ×2
+              </button>
+              <button
+                onClick={() => setPhysics({ scale: (body.scale ?? 1) * 5 })}
+                className="flex-1 border border-nasa-border hover:border-nasa-accent hover:bg-nasa-border/30 text-nasa-text px-1 py-0.5 text-[10px] transition"
+              >
+                ×5
+              </button>
+              <button
+                onClick={() => setPhysics({ scale: (body.scale ?? 1) * 10 })}
+                className="flex-1 border border-nasa-border hover:border-nasa-accent hover:bg-nasa-border/30 text-nasa-text px-1 py-0.5 text-[10px] transition"
+              >
+                ×10
+              </button>
+            </div>
+          </div>
         </Section>
 
         <Section title="POSITION (m)">

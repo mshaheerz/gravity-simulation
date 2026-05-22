@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Panel, Stub } from '../components/Panel'
 import { Viewport } from '../viewport/Viewport'
-import { useSim, WORLD_PRESETS, type WorldPresetId } from '../store/sim'
+import { useSim, WORLD_PRESETS, MAP_PRESETS, type WorldPresetId, type MapId } from '../store/sim'
 import { PRESETS, PRESETS_BY_ID } from '../sim/presets'
 import {
   applySnapshot,
@@ -193,16 +193,107 @@ export function PhysicsConsolePanel() {
   const airDensity = useSim((s) => s.airDensity)
   const timeScale = useSim((s) => s.timeScale)
   const worldPreset = useSim((s) => s.worldPreset)
+  const map = useSim((s) => s.map)
+  const defaultTerrain = useSim((s) => s.defaultTerrain)
 
   const setGravity = useSim((s) => s.setGravity)
   const setVacuum = useSim((s) => s.setVacuum)
   const setAirDensity = useSim((s) => s.setAirDensity)
   const setTimeScale = useSim((s) => s.setTimeScale)
   const applyWorldPreset = useSim((s) => s.applyWorldPreset)
+  const setMap = useSim((s) => s.setMap)
+  const setDefaultTerrain = useSim((s) => s.setDefaultTerrain)
+  const spawnPoint = useSim((s) => s.spawnPoint)
+  const setSpawnPoint = useSim((s) => s.setSpawnPoint)
+  const resetCamera = useSim((s) => s.resetCamera)
 
   return (
     <Panel>
       <div className="space-y-3 text-[12px]">
+        <Section title="MAP PRESETS">
+          <div className="grid grid-cols-2 gap-1 mb-2">
+            {MAP_PRESETS.map((m) => {
+              const active = map === m.id
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => setMap(m.id as MapId)}
+                  title={m.description}
+                  className={
+                    'border px-1.5 py-1 text-[10px] text-left transition ' +
+                    (active
+                      ? 'border-nasa-accent bg-nasa-accent/15 text-nasa-accent'
+                      : 'border-nasa-border hover:border-nasa-accent hover:bg-nasa-border/30 text-nasa-text')
+                  }
+                >
+                  <div className="font-bold">{m.label}</div>
+                  <div className="text-nasa-dim">{m.description}</div>
+                </button>
+              )
+            })}
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-nasa-dim text-[11px]">DEFAULT TERRAIN</span>
+            <button
+              onClick={() => setDefaultTerrain(!defaultTerrain)}
+              className={
+                'border px-2 py-0.5 text-[10px] transition ' +
+                (defaultTerrain
+                  ? 'border-nasa-accent text-nasa-accent hover:bg-nasa-accent/10'
+                  : 'border-nasa-border text-nasa-text hover:border-nasa-accent')
+              }
+            >
+              {defaultTerrain ? '[ ON ]' : '[ OFF ]'}
+            </button>
+          </div>
+        </Section>
+        <Section title="CAMERA & SPAWN">
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <button
+                onClick={resetCamera}
+                className="flex-1 border border-nasa-border hover:border-nasa-accent hover:bg-nasa-border/30 text-nasa-text px-1 py-0.5 text-[10px] transition"
+              >
+                RESET CAMERA
+              </button>
+            </div>
+            <div className="space-y-1">
+              <div className="text-nasa-dim text-[11px]">SPAWN POINT</div>
+              <div className="grid grid-cols-3 gap-1">
+                <div className="space-y-1">
+                  <div className="text-[10px] text-nasa-dim">X</div>
+                  <input
+                    type="number"
+                    value={spawnPoint[0]}
+                    step={0.5}
+                    onChange={(e) => setSpawnPoint([parseFloat(e.target.value) || 0, spawnPoint[1], spawnPoint[2]])}
+                    className="w-full bg-transparent border border-nasa-border px-1 py-0.5 text-[10px] text-nasa-text focus:outline-none focus:border-nasa-accent"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <div className="text-[10px] text-nasa-dim">Y</div>
+                  <input
+                    type="number"
+                    value={spawnPoint[1]}
+                    step={0.5}
+                    onChange={(e) => setSpawnPoint([spawnPoint[0], parseFloat(e.target.value) || 0, spawnPoint[2]])}
+                    className="w-full bg-transparent border border-nasa-border px-1 py-0.5 text-[10px] text-nasa-text focus:outline-none focus:border-nasa-accent"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <div className="text-[10px] text-nasa-dim">Z</div>
+                  <input
+                    type="number"
+                    value={spawnPoint[2]}
+                    step={0.5}
+                    onChange={(e) => setSpawnPoint([spawnPoint[0], spawnPoint[1], parseFloat(e.target.value) || 0])}
+                    className="w-full bg-transparent border border-nasa-border px-1 py-0.5 text-[10px] text-nasa-text focus:outline-none focus:border-nasa-accent"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </Section>
         <Section title="WORLD PRESETS">
           <div className="grid grid-cols-3 gap-1">
             {WORLD_PRESETS.map((w) => {
@@ -311,6 +402,7 @@ export function ObjectLibraryPanel() {
   const spawn = useSim((s) => s.spawn)
   const bumpReset = useSim((s) => s.bumpReset)
   const clearBodies = useSim((s) => s.clearBodies)
+  const setDefaultTerrain = useSim((s) => s.setDefaultTerrain)
   const assets = useCustomAssetList()
   const [status, setStatus] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -413,18 +505,21 @@ export function ObjectLibraryPanel() {
           }}
           onDragLeave={() => setDragOver(false)}
           onDrop={onDrop}
-          onClick={() => fileInputRef.current?.click()}
           className={
-            'cursor-pointer border-2 border-dashed text-center px-2 py-3 text-[10px] transition ' +
+            'border-2 border-dashed text-center px-2 py-3 text-[10px] transition mb-2 ' +
             (dragOver
               ? 'border-nasa-accent bg-nasa-accent/10 text-nasa-accent'
-              : 'border-nasa-border bg-black/30 text-nasa-dim hover:text-nasa-text hover:border-nasa-accent')
+              : 'border-nasa-border bg-black/30 text-nasa-dim')
           }
         >
           ⇡ drop .glb / .gltf / .obj / .png / .jpg here
-          <br />
-          <span className="opacity-70">or click to browse</span>
         </div>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full border border-nasa-border hover:border-nasa-accent hover:bg-nasa-border/30 text-nasa-text px-2 py-2 text-[11px] transition"
+        >
+          📁 BROWSE FILES
+        </button>
         <input
           ref={fileInputRef}
           type="file"
@@ -438,29 +533,42 @@ export function ObjectLibraryPanel() {
           }}
         />
         {assets.length > 0 && (
-          <div className="grid grid-cols-2 gap-1 mt-1">
+          <div className="space-y-1 mt-1">
             {assets.map((a) => (
               <div
                 key={a.id}
                 className="border border-nasa-border bg-black/40 hover:bg-nasa-border/30 hover:border-nasa-accent transition px-2 py-1.5 text-left group relative"
               >
-                <button
-                  onClick={() => {
-                    spawn('custom', { customAssetId: a.id, label: a.name })
-                  }}
-                  className="w-full text-left"
-                  title={`Spawn ${a.name}`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-nasa-warn text-base">{a.emoji}</span>
-                    <span className="text-nasa-accent text-[11px] truncate">
-                      {a.name}
-                    </span>
-                  </div>
-                  <div className="text-nasa-dim text-[10px] mt-0.5 uppercase">
-                    {a.kind} · r={a.defaultRadius}m
-                  </div>
-                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-nasa-warn text-base">{a.emoji}</span>
+                  <span className="text-nasa-accent text-[11px] truncate flex-1">
+                    {a.name}
+                  </span>
+                </div>
+                <div className="text-nasa-dim text-[10px] mt-0.5 uppercase mb-1">
+                  {a.kind} · r={a.defaultRadius}m
+                </div>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => {
+                      spawn('custom', { customAssetId: a.id, label: a.name })
+                    }}
+                    className="flex-1 border border-nasa-border hover:border-nasa-accent hover:bg-nasa-border/30 text-nasa-text px-1 py-0.5 text-[10px] transition"
+                    title={`Spawn ${a.name} as object`}
+                  >
+                    [ OBJECT ]
+                  </button>
+                  <button
+                    onClick={() => {
+                      setDefaultTerrain(false)
+                      spawn('custom', { customAssetId: a.id, label: a.name, fixed: true, terrain: true, pos: [0, 0, 0], scale: 10 })
+                    }}
+                    className="flex-1 border border-nasa-accent hover:bg-nasa-accent/10 text-nasa-accent px-1 py-0.5 text-[10px] transition"
+                    title={`Spawn ${a.name} as terrain`}
+                  >
+                    [ TERRAIN ]
+                  </button>
+                </div>
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
