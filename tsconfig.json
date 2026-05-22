@@ -1,5 +1,4 @@
 {
-  "extends": "./.void/tsconfig.json",
   "files": [],
   "references": [
     {
@@ -8,10 +7,5 @@
     {
       "path": "./tsconfig.node.json"
     }
-  ],
-  "compilerOptions": {
-    "types": [
-      "void/env"
-    ]
-  }
+  ]
 }
