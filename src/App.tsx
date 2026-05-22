@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { DockShell } from './dock/DockShell'
 import { useSim } from './store/sim'
+import { ThemeSwitcher } from './components/ThemeSwitcher'
 
 const BOOT_LINES = [
   'INIT PHYSICS CORE........... OK',
@@ -76,6 +77,12 @@ function App() {
     setStartedAt(Date.now())
   }
 
+  useEffect(() => {
+    const onToggleCrt = () => setScanlines((v) => !v)
+    window.addEventListener('gravsim:toggle-crt', onToggleCrt)
+    return () => window.removeEventListener('gravsim:toggle-crt', onToggleCrt)
+  }, [])
+
   if (!booted) {
     return (
       <div className={scanlines ? 'scanlines h-full' : 'h-full'}>
@@ -93,6 +100,7 @@ function App() {
         </div>
         <div className="flex items-center gap-4">
           <span className="text-nasa-warn">{clock}</span>
+          <ThemeSwitcher />
           <button
             onClick={() => setScanlines((v) => !v)}
             className="text-nasa-dim hover:text-nasa-accent transition-colors"

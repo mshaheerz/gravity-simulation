@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { useThemeColors } from '../sim/useThemeColors'
 
 export function Moon({
   orbitRadius = 4,
@@ -13,6 +14,7 @@ export function Moon({
 }) {
   const pivot = useRef<THREE.Group>(null)
   const moon = useRef<THREE.Mesh>(null)
+  const colors = useThemeColors()
 
   useFrame((_, dt) => {
     if (pivot.current) pivot.current.rotation.y += dt * orbitSpeed
@@ -35,7 +37,7 @@ export function Moon({
       {/* Orbital path */}
       <mesh rotation={[Math.PI / 2, 0, 0]}>
         <ringGeometry args={[orbitRadius - 0.005, orbitRadius + 0.005, 256]} />
-        <meshBasicMaterial color="#1a3a1a" side={THREE.DoubleSide} transparent opacity={0.6} />
+        <meshBasicMaterial color={colors.border} side={THREE.DoubleSide} transparent opacity={0.6} />
       </mesh>
     </group>
   )

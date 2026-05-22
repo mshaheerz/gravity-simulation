@@ -5,27 +5,56 @@ import type { Body as BodyData } from '../store/sim'
 import { PRESETS_BY_ID } from '../sim/presets'
 import { useSim } from '../store/sim'
 import { bodyRefs } from '../sim/bodyRefs'
+import { CustomBody } from './CustomBody'
+import { reportImpact } from '../sim/impactFx'
+import { useThemeColors } from '../sim/useThemeColors'
 
 export function Body({ body }: { body: BodyData }) {
+  // User-uploaded assets live in a parallel registry and render via CustomBody.
+  if (body.presetId === 'custom') {
+    return <CustomBody body={body} />
+  }
+
   const preset = PRESETS_BY_ID[body.presetId]
 
   const selectedId = useSim((s) => s.selectedId)
   const selectBody = useSim((s) => s.selectBody)
+  const vacuum = useSim((s) => s.vacuum)
+  const airDensity = useSim((s) => s.airDensity)
+  const colors = useThemeColors()
   const isSelected = selectedId === body.id
   const rbRef = useRef<RapierRigidBody | null>(null)
+
+  // Resolve effective physics values (may be used before preset-null short-circuit,
+  // so default safely if the preset is missing).
+  const mass = body.mass ?? preset?.mass ?? 1
+  const restitution = body.restitution ?? preset?.restitution ?? 0.3
+  const friction = body.friction ?? preset?.friction ?? 0.5
+  const baseDamping = body.linearDamping ?? preset?.linearDamping ?? 0
+  // Vacuum → no drag. Otherwise scale per-body damping by ambient air density
+  // (Earth sea level = 1.225 kg/m³ is the reference where damping == preset value).
+  const linearDamping = vacuum ? 0 : baseDamping * (airDensity / 1.225)
+  const color = body.color ?? preset?.color ?? '#ffffff'
 
   useEffect(() => {
     bodyRefs.set(body.id, rbRef.current)
     return () => bodyRefs.delete(body.id)
   }, [body.id])
 
-  if (!preset) return null
+  // Keep linear damping in sync when vacuum / airDensity / per-body damping
+  // change at runtime — RigidBody reads the prop only at construction, so we
+  // patch the live Rapier body directly.
+  useEffect(() => {
+    const rb = rbRef.current
+    if (!rb) return
+    try {
+      rb.setLinearDamping(linearDamping)
+    } catch {
+      /* older Rapier types: ignore */
+    }
+  }, [linearDamping])
 
-  const mass = body.mass ?? preset.mass
-  const restitution = body.restitution ?? preset.restitution
-  const friction = body.friction ?? preset.friction
-  const linearDamping = body.linearDamping ?? preset.linearDamping
-  const color = body.color ?? preset.color
+  if (!preset) return null
 
   const onClick = (e: any) => {
     e.stopPropagation()
@@ -35,9 +64,16 @@ export function Body({ body }: { body: BodyData }) {
   const selectionRing = isSelected && (
     <mesh rotation={[Math.PI / 2, 0, 0]}>
       <ringGeometry args={[selectionRadius(preset.shape, preset.dims) + 0.08, selectionRadius(preset.shape, preset.dims) + 0.14, 64]} />
-      <meshBasicMaterial color="#00ff66" side={THREE.DoubleSide} transparent opacity={0.9} depthTest={false} />
+      <meshBasicMaterial color={colors.accent} side={THREE.DoubleSide} transparent opacity={0.9} depthTest={false} />
     </mesh>
   )
+
+  const onCollisionEnter = () => {
+    const rb = rbRef.current
+    if (!rb) return
+    const v = rb.linvel()
+    reportImpact(body.id, Math.hypot(v.x, v.y, v.z))
+  }
 
   // Mass density override for Rapier — give it a `density` proxy via collider mass props
   // Rapier in @react-three/rapier exposes `mass` on the collider via `density` indirectly;
@@ -54,6 +90,7 @@ export function Body({ body }: { body: BodyData }) {
     linearDamping,
     angularDamping: 0.05,
     onClick,
+    onCollisionEnter,
   } as const
 
   if (preset.shape === 'sphere') {

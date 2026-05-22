@@ -1,22 +1,36 @@
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Stars } from '@react-three/drei'
+import { OrbitControls, Stars, Sky } from '@react-three/drei'
 import { SpaceScene } from './SpaceScene'
 import { SurfaceScene } from './SurfaceScene'
 import { ViewportHud } from './Hud'
 import { useSim } from '../store/sim'
+import { useThemeColors } from '../sim/useThemeColors'
 
-function Lights() {
+function Lights({ accent, dayMode }: { accent: string; dayMode: boolean }) {
+  if (dayMode) {
+    return (
+      <>
+        <directionalLight position={[20, 35, 12]} intensity={3.2} color="#fff4d6" castShadow shadow-mapSize={[2048, 2048]} />
+        <ambientLight intensity={0.5} color="#dcecff" />
+        <directionalLight position={[-12, 8, -10]} intensity={0.35} color="#bcd7ff" />
+      </>
+    )
+  }
+
   return (
     <>
       <directionalLight position={[10, 15, 8]} intensity={2.2} color="#fff7e0" castShadow shadow-mapSize={[1024, 1024]} />
       <ambientLight intensity={0.18} color="#0a0e2a" />
-      <directionalLight position={[-8, -2, -6]} intensity={0.15} color="#00ff66" />
+      <directionalLight position={[-8, -2, -6]} intensity={0.15} color={accent} />
     </>
   )
 }
 
 export function Viewport() {
   const viewMode = useSim((s) => s.viewMode)
+  const theme = useSim((s) => s.theme)
+  const colors = useThemeColors()
+  const daySurface = theme === 'day' && viewMode === 'surface'
 
   const cameraInit =
     viewMode === 'surface'
@@ -31,11 +45,12 @@ export function Viewport() {
         camera={{ ...cameraInit, near: 0.01, far: 2000 }}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
       >
-        <color attach="background" args={['#000004']} />
+        <color attach="background" args={[colors.bg]} />
 
-        <Stars radius={120} depth={60} count={4500} factor={3} saturation={0} fade speed={0.4} />
+        {viewMode === 'space' && <Stars radius={120} depth={60} count={4500} factor={3} saturation={0} fade speed={0.4} />}
+        {daySurface && <Sky distance={450000} sunPosition={[100, 35, 45]} turbidity={3} rayleigh={1.2} mieCoefficient={0.006} mieDirectionalG={0.82} />}
 
-        <Lights />
+        <Lights accent={colors.accent} dayMode={daySurface} />
 
         {viewMode === 'space' ? <SpaceScene /> : <SurfaceScene />}
 

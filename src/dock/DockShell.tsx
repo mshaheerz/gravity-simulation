@@ -14,6 +14,11 @@ import {
   TerminalPanel,
   EventLogPanel,
 } from '../panels'
+import { SimClock } from '../sim/SimClock'
+import { PersistenceBridge } from '../sim/PersistenceBridge'
+import { EventBridge } from '../sim/EventBridge'
+import { KeyboardShortcuts } from '../sim/KeyboardShortcuts'
+import { ThemeBridge } from '../sim/ThemeBridge'
 
 const wrap = (Comp: React.FC) => (_: IDockviewPanelProps) => <Comp />
 
@@ -101,6 +106,11 @@ export function DockShell() {
 
   return (
     <div className="h-full w-full">
+      <SimClock />
+      <PersistenceBridge />
+      <EventBridge />
+      <KeyboardShortcuts />
+      <ThemeBridge />
       <DockviewReact
         components={components}
         onReady={onReady}

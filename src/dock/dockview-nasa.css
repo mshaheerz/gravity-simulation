@@ -1,7 +1,7 @@
 .dockview-theme-nasa {
-  --dv-background-color: #000000;
+  --dv-background-color: var(--nasa-bg);
   --dv-paneview-active-outline-color: var(--nasa-accent);
-  --dv-tabs-and-actions-container-background-color: #050a05;
+  --dv-tabs-and-actions-container-background-color: var(--nasa-panel);
   --dv-tabs-and-actions-container-font-size: 11px;
   --dv-tabs-and-actions-container-height: 26px;
   --dv-tab-font-size: 11px;
@@ -10,29 +10,29 @@
   --dv-tab-close-icon-size: 12px;
   --dv-tab-margin: 0px;
 
-  --dv-activegroup-visiblepanel-tab-background-color: #001a08;
+  --dv-activegroup-visiblepanel-tab-background-color: var(--nasa-bg);
   --dv-activegroup-visiblepanel-tab-color: var(--nasa-accent);
-  --dv-activegroup-hiddenpanel-tab-background-color: #050a05;
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--nasa-panel);
   --dv-activegroup-hiddenpanel-tab-color: var(--nasa-dim);
 
-  --dv-inactivegroup-visiblepanel-tab-background-color: #050a05;
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--nasa-panel);
   --dv-inactivegroup-visiblepanel-tab-color: var(--nasa-dim);
-  --dv-inactivegroup-hiddenpanel-tab-background-color: #050a05;
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--nasa-panel);
   --dv-inactivegroup-hiddenpanel-tab-color: var(--nasa-dim);
 
-  --dv-group-view-background-color: #000000;
+  --dv-group-view-background-color: var(--nasa-bg);
   --dv-separator-border: var(--nasa-border);
   --dv-sash-color: transparent;
   --dv-active-sash-color: var(--nasa-accent);
   --dv-sash-border-radius: 0px;
 
-  --dv-drag-over-background-color: rgba(0, 255, 102, 0.08);
+  --dv-drag-over-background-color: rgba(var(--nasa-accent-rgb), 0.08);
   --dv-drag-over-border-color: var(--nasa-accent);
   --dv-drag-over-border: 1px dashed var(--nasa-accent);
 
-  --dv-icon-hover-background-color: rgba(0, 255, 102, 0.12);
+  --dv-icon-hover-background-color: rgba(var(--nasa-accent-rgb), 0.12);
   --dv-floating-border: 1px solid var(--nasa-border);
-  --dv-floating-box-shadow: 0 4px 24px rgba(0, 255, 102, 0.18);
+  --dv-floating-box-shadow: 0 4px 24px rgba(var(--nasa-accent-rgb), 0.18);
   --dv-floating-group-border: 1px solid var(--nasa-accent);
   --dv-floating-group-dragging-opacity: 0.85;
 
@@ -42,7 +42,7 @@
   --dv-border-radius: 0px;
   --dv-spacing-padding: 0px;
 
-  background: #000000;
+  background: var(--nasa-bg);
   color: var(--nasa-text);
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   height: 100%;
@@ -55,7 +55,7 @@
 }
 
 .dockview-theme-nasa .tab.active-tab .tab-content {
-  text-shadow: 0 0 6px rgba(0, 255, 102, 0.6);
+  text-shadow: 0 0 6px rgba(var(--nasa-accent-rgb), 0.6);
 }
 
 .dockview-theme-nasa .groupview {

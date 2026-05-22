@@ -1,10 +1,12 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { useThemeColors } from '../sim/useThemeColors'
 
 export function Earth({ position = [0, 0, 0] as [number, number, number] }) {
   const group = useRef<THREE.Group>(null)
   const wireframe = useRef<THREE.Mesh>(null)
+  const colors = useThemeColors()
 
   useFrame((_, dt) => {
     if (group.current) group.current.rotation.y += dt * 0.05
@@ -29,7 +31,7 @@ export function Earth({ position = [0, 0, 0] as [number, number, number] }) {
       <mesh ref={wireframe} scale={1.002}>
         <icosahedronGeometry args={[1, 8]} />
         <meshBasicMaterial
-          color="#00ff66"
+          color={colors.accent}
           wireframe
           transparent
           opacity={0.12}
@@ -52,7 +54,7 @@ export function Earth({ position = [0, 0, 0] as [number, number, number] }) {
       {/* Equator ring marker */}
       <mesh rotation={[Math.PI / 2, 0, 0]}>
         <ringGeometry args={[1.04, 1.05, 96]} />
-        <meshBasicMaterial color="#00ff66" transparent opacity={0.35} side={THREE.DoubleSide} />
+        <meshBasicMaterial color={colors.accent} transparent opacity={0.35} side={THREE.DoubleSide} />
       </mesh>
     </group>
   )

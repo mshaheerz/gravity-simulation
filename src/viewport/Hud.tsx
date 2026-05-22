@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { useSim } from '../store/sim'
+import { formatMissionClock } from '../sim/SimClock'
 
 export function ViewportHud() {
   const viewMode = useSim((s) => s.viewMode)
@@ -8,6 +10,14 @@ export function ViewportHud() {
   const bumpReset = useSim((s) => s.bumpReset)
   const gravity = useSim((s) => s.gravity)
   const bodyCount = useSim((s) => s.bodies.length)
+
+  // Mission clock — poll the store at 10 Hz so the HUD doesn't re-render on
+  // every rAF tick. Spec calls for `T+00:00:12.345` top-right.
+  const [clock, setClock] = useState(() => useSim.getState().simTime)
+  useEffect(() => {
+    const id = setInterval(() => setClock(useSim.getState().simTime), 100)
+    return () => clearInterval(id)
+  }, [])
 
   return (
     <div className="pointer-events-none absolute inset-0 font-mono text-[10px] text-nasa-accent select-none">
@@ -32,6 +42,9 @@ export function ViewportHud() {
 
       {/* Top-right labels */}
       <div className="absolute top-2 right-3 text-right leading-tight">
+        <div className="phosphor-glow tracking-wider text-[11px]">
+          {formatMissionClock(clock)}
+        </div>
         <div>MODE ▸ {viewMode.toUpperCase()}</div>
         <div className="text-nasa-warn">G ▸ {gravity.toFixed(2)} m/s²</div>
         <div className="text-nasa-dim">

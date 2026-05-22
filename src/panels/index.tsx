@@ -1,7 +1,18 @@
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Panel, Stub } from '../components/Panel'
 import { Viewport } from '../viewport/Viewport'
-import { useSim } from '../store/sim'
+import { useSim, WORLD_PRESETS, type WorldPresetId } from '../store/sim'
 import { PRESETS, PRESETS_BY_ID } from '../sim/presets'
+import {
+  applySnapshot,
+  downloadSim,
+  encodeForUrl,
+  serialize,
+  uploadSim,
+} from '../sim/save'
+import { customAssets, type CustomAsset } from '../sim/customAssets'
+import { events, type SimEvent } from '../sim/events'
+import { formatMissionClock } from '../sim/SimClock'
 
 export function ViewportPanel() {
   return (
@@ -39,6 +50,12 @@ export function SceneTreePanel() {
         )}
         {bodies.map((b) => {
           const preset = PRESETS_BY_ID[b.presetId]
+          const custom = b.customAssetId ? customAssets.get(b.customAssetId) : undefined
+          const swatchColor = preset?.color ?? '#9fc8ff'
+          const swatchGlyph = preset?.emoji ?? custom?.emoji ?? '?'
+          const typeLabel =
+            preset?.label.toLowerCase() ??
+            (custom ? `${custom.kind} · ${custom.name}` : 'custom')
           const isSelected = selectedId === b.id
           return (
             <div
@@ -52,9 +69,9 @@ export function SceneTreePanel() {
               }
             >
               <span>
-                ▸ <span style={{ color: preset?.color ?? '#fff' }}>{preset?.emoji ?? '?'}</span>{' '}
+                ▸ <span style={{ color: swatchColor }}>{swatchGlyph}</span>{' '}
                 <span className="text-nasa-text">{b.label ?? b.id}</span>{' '}
-                <span className="text-nasa-dim">// {preset?.label.toLowerCase()}</span>
+                <span className="text-nasa-dim">// {typeLabel}</span>
               </span>
               <button
                 onClick={(e) => {
@@ -75,30 +92,218 @@ export function SceneTreePanel() {
 
 export { InspectorPanelEditable as InspectorPanel } from './InspectorEditable'
 
+function ConsoleSlider({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+  step,
+  suffix = '',
+  decimals,
+}: {
+  label: string
+  value: number
+  onChange: (v: number) => void
+  min: number
+  max: number
+  step: number
+  suffix?: string
+  decimals?: number
+}) {
+  const d = decimals ?? (step < 0.01 ? 3 : step < 0.1 ? 2 : step < 1 ? 1 : 0)
+  return (
+    <label className="flex flex-col gap-0.5">
+      <div className="flex justify-between text-[11px]">
+        <span className="text-nasa-dim">{label}</span>
+        <span className="text-nasa-text">
+          {value.toFixed(d)}
+          {suffix}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        className="nasa-range"
+      />
+    </label>
+  )
+}
+
+// Log-slider for time-scale: linear UI 0..1 mapped to 0.01..10000 logarithmically.
+function LogSlider({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+  suffix = '',
+}: {
+  label: string
+  value: number
+  onChange: (v: number) => void
+  min: number
+  max: number
+  suffix?: string
+}) {
+  const lmin = Math.log(min)
+  const lmax = Math.log(max)
+  const norm = (Math.log(Math.max(value, min)) - lmin) / (lmax - lmin)
+  return (
+    <label className="flex flex-col gap-0.5">
+      <div className="flex justify-between text-[11px]">
+        <span className="text-nasa-dim">{label}</span>
+        <span className="text-nasa-text">
+          ×{value < 1 ? value.toFixed(3) : value < 100 ? value.toFixed(2) : value.toFixed(0)}
+          {suffix}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.001}
+        value={norm}
+        onChange={(e) => {
+          const n = parseFloat(e.target.value)
+          onChange(Math.exp(lmin + n * (lmax - lmin)))
+        }}
+        className="nasa-range"
+      />
+    </label>
+  )
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="border border-nasa-border bg-black/40 p-2">
+      <div className="panel-title text-[10px] mb-2">[ {title} ]</div>
+      <div className="space-y-2">{children}</div>
+    </div>
+  )
+}
+
 export function PhysicsConsolePanel() {
   const gravity = useSim((s) => s.gravity)
   const vacuum = useSim((s) => s.vacuum)
+  const airDensity = useSim((s) => s.airDensity)
   const timeScale = useSim((s) => s.timeScale)
+  const worldPreset = useSim((s) => s.worldPreset)
+
+  const setGravity = useSim((s) => s.setGravity)
+  const setVacuum = useSim((s) => s.setVacuum)
+  const setAirDensity = useSim((s) => s.setAirDensity)
+  const setTimeScale = useSim((s) => s.setTimeScale)
+  const applyWorldPreset = useSim((s) => s.applyWorldPreset)
+
   return (
     <Panel>
-      <div className="space-y-2 text-[12px]">
-        <div>
-          <span className="text-nasa-dim">G =</span>{' '}
-          <span className="text-nasa-warn">{gravity.toFixed(3)} m/s²</span>
-        </div>
-        <div>
-          <span className="text-nasa-dim">VACUUM =</span>{' '}
-          <span className={vacuum ? 'text-nasa-accent' : 'text-nasa-danger'}>
-            {vacuum ? 'ON' : 'OFF'}
-          </span>
-        </div>
-        <div>
-          <span className="text-nasa-dim">TIMESCALE =</span>{' '}
-          <span className="text-nasa-accent">×{timeScale.toFixed(2)}</span>
-        </div>
-        <Stub label="sliders + preset world buttons (milestone 7)" />
+      <div className="space-y-3 text-[12px]">
+        <Section title="WORLD PRESETS">
+          <div className="grid grid-cols-3 gap-1">
+            {WORLD_PRESETS.map((w) => {
+              const active = worldPreset === w.id
+              return (
+                <button
+                  key={w.id}
+                  onClick={() => applyWorldPreset(w.id as WorldPresetId)}
+                  title={`${w.description}\nG=${w.gravity} · ρ=${w.airDensity}`}
+                  className={
+                    'border px-1.5 py-1 text-[10px] text-left transition ' +
+                    (active
+                      ? 'border-nasa-accent bg-nasa-accent/15 text-nasa-accent'
+                      : 'border-nasa-border hover:border-nasa-accent hover:bg-nasa-border/30 text-nasa-text')
+                  }
+                >
+                  <div className="font-bold">{w.label}</div>
+                  <div className="text-nasa-dim">g={w.gravity}</div>
+                </button>
+              )
+            })}
+          </div>
+        </Section>
+
+        <Section title="GRAVITY">
+          <ConsoleSlider
+            label="G"
+            value={gravity}
+            min={0}
+            max={30}
+            step={0.01}
+            suffix=" m/s²"
+            onChange={setGravity}
+          />
+        </Section>
+
+        <Section title="ATMOSPHERE">
+          <div className="flex items-center justify-between">
+            <span className="text-nasa-dim text-[11px]">VACUUM</span>
+            <button
+              onClick={() => setVacuum(!vacuum)}
+              className={
+                'border px-2 py-0.5 text-[10px] transition ' +
+                (vacuum
+                  ? 'border-nasa-accent text-nasa-accent bg-nasa-accent/10'
+                  : 'border-nasa-border text-nasa-text hover:border-nasa-accent')
+              }
+            >
+              {vacuum ? '[ ON ]' : '[ OFF ]'}
+            </button>
+          </div>
+          <ConsoleSlider
+            label="AIR DENSITY"
+            value={airDensity}
+            min={0}
+            max={10}
+            step={0.001}
+            suffix=" kg/m³"
+            onChange={setAirDensity}
+          />
+          <div className="text-nasa-dim text-[10px] italic">
+            // earth ≈ 1.225 · mars ≈ 0.020 · vacuum kills all drag
+          </div>
+        </Section>
+
+        <Section title="TIME">
+          <LogSlider
+            label="TIME-SCALE"
+            value={timeScale}
+            min={0.01}
+            max={10000}
+            onChange={setTimeScale}
+          />
+          <div className="flex gap-1">
+            {[0.1, 0.5, 1, 2, 10, 100].map((t) => (
+              <button
+                key={t}
+                onClick={() => setTimeScale(t)}
+                className={
+                  'flex-1 border px-1 py-0.5 text-[10px] transition ' +
+                  (Math.abs(timeScale - t) < 1e-6
+                    ? 'border-nasa-accent text-nasa-accent bg-nasa-accent/10'
+                    : 'border-nasa-border text-nasa-text hover:border-nasa-accent')
+                }
+              >
+                ×{t}
+              </button>
+            ))}
+          </div>
+        </Section>
       </div>
     </Panel>
+  )
+}
+
+function useCustomAssetList(): CustomAsset[] {
+  // customAssets.list() now returns a stable array reference that only changes
+  // when assets are added/removed, so useSyncExternalStore won't loop.
+  return useSyncExternalStore(
+    customAssets.subscribe,
+    () => customAssets.list(),
   )
 }
 
@@ -106,6 +311,60 @@ export function ObjectLibraryPanel() {
   const spawn = useSim((s) => s.spawn)
   const bumpReset = useSim((s) => s.bumpReset)
   const clearBodies = useSim((s) => s.clearBodies)
+  const assets = useCustomAssetList()
+  const [status, setStatus] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const flash = (kind: 'ok' | 'err', text: string) => {
+    setStatus({ kind, text })
+    window.setTimeout(() => setStatus(null), 2200)
+  }
+
+  const ingest = (files: FileList | File[]) => {
+    const res = customAssets.ingestFiles(files)
+    if (res.accepted > 0 && res.rejected.length === 0) {
+      flash('ok', `loaded ${res.accepted} asset${res.accepted === 1 ? '' : 's'}`)
+    } else if (res.accepted > 0) {
+      flash('ok', `loaded ${res.accepted} · rejected ${res.rejected.length} (.glb/.gltf/.obj/.png/.jpg only)`)
+    } else {
+      flash('err', `unsupported format — accepts .glb / .gltf / .obj / .png / .jpg`)
+    }
+  }
+
+  const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setDragOver(false)
+    if (e.dataTransfer.files?.length) ingest(e.dataTransfer.files)
+  }
+
+  const handleExport = () => {
+    downloadSim()
+    flash('ok', 'exported scene.sim')
+  }
+  const handleImport = async () => {
+    try {
+      const snap = await uploadSim()
+      applySnapshot(snap)
+      flash('ok', `loaded ${snap.bodies.length} bodies`)
+    } catch (e) {
+      flash('err', e instanceof Error ? e.message : 'load failed')
+    }
+  }
+  const handleShare = async () => {
+    const url = window.location.origin + window.location.pathname + '#share=' + encodeForUrl(serialize())
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(url)
+        flash('ok', 'share URL copied to clipboard')
+      } else {
+        // Fall back to navigating so the user can copy from the address bar.
+        window.prompt('Share URL — copy & paste:', url)
+        flash('ok', 'share URL shown')
+      }
+    } catch {
+      flash('err', 'clipboard blocked')
+    }
+  }
 
   return (
     <Panel>
@@ -141,116 +400,182 @@ export function ObjectLibraryPanel() {
           [ CLEAR ALL ]
         </button>
       </div>
-      <div className="text-nasa-dim text-[10px] mt-2 italic">
-        // click a preset to spawn at a random altitude · custom GLB/PNG upload in milestone 12
-      </div>
-    </Panel>
-  )
-}
 
-export function TelemetryPanel() {
-  return (
-    <Panel>
-      <div className="h-32 border border-nasa-border bg-black/60 mb-2 flex items-center justify-center text-nasa-dim text-[10px]">
-        // uPlot chart slot — altitude vs t
-      </div>
-      <div className="h-32 border border-nasa-border bg-black/60 flex items-center justify-center text-nasa-dim text-[10px]">
-        // uPlot chart slot — velocity vs t
-      </div>
-      <Stub label="live charts wire up in milestone 8" />
-    </Panel>
-  )
-}
-
-export function TimelinePanel() {
-  const paused = useSim((s) => s.paused)
-  const setPaused = useSim((s) => s.setPaused)
-  const bumpReset = useSim((s) => s.bumpReset)
-  const timeScale = useSim((s) => s.timeScale)
-
-  return (
-    <Panel scroll={false}>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => bumpReset()}
-          className="border border-nasa-border px-2 py-1 hover:border-nasa-accent"
-        >
-          ⏮ RST
-        </button>
-        <button
-          onClick={() => setPaused(true)}
-          className={
-            'border px-2 py-1 ' +
-            (paused
-              ? 'border-nasa-warn text-nasa-warn'
-              : 'border-nasa-border hover:border-nasa-accent')
-          }
-        >
-          ⏸ PSE
-        </button>
-        <button
-          onClick={() => setPaused(false)}
-          className={
-            'border px-2 py-1 ' +
-            (!paused
-              ? 'border-nasa-accent text-nasa-accent'
-              : 'border-nasa-border hover:border-nasa-accent')
-          }
-        >
-          ▶ PLY
-        </button>
-        <button className="border border-nasa-border px-2 py-1 hover:border-nasa-accent">⏭ STP</button>
-        <div className="flex-1 h-1 bg-nasa-border mx-2 relative">
-          <div className="absolute inset-y-0 left-0 w-1/4 bg-nasa-accent" />
+      <div className="mt-2 pt-2 border-t border-nasa-border">
+        <div className="flex justify-between items-center mb-1">
+          <div className="panel-title text-[10px]">[ CUSTOM ASSETS ]</div>
+          <span className="text-nasa-dim text-[10px]">{assets.length} loaded</span>
         </div>
-        <span className="text-nasa-warn text-[11px]">×{timeScale.toFixed(2)}</span>
-      </div>
-    </Panel>
-  )
-}
-
-export function TerminalPanel() {
-  return (
-    <Panel scroll={false}>
-      <div className="h-full flex flex-col font-mono text-[12px]">
-        <div className="flex-1 overflow-auto space-y-0.5">
-          <div className="text-nasa-dim">GRAVSIM SHELL v0.0.1 — type 'help' (milestone 10)</div>
-          <div>
-            <span className="text-nasa-accent">gravsim&gt;</span>{' '}
-            <span className="text-nasa-dim">// awaiting input</span>
+        <div
+          onDragOver={(e) => {
+            e.preventDefault()
+            setDragOver(true)
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={onDrop}
+          onClick={() => fileInputRef.current?.click()}
+          className={
+            'cursor-pointer border-2 border-dashed text-center px-2 py-3 text-[10px] transition ' +
+            (dragOver
+              ? 'border-nasa-accent bg-nasa-accent/10 text-nasa-accent'
+              : 'border-nasa-border bg-black/30 text-nasa-dim hover:text-nasa-text hover:border-nasa-accent')
+          }
+        >
+          ⇡ drop .glb / .gltf / .obj / .png / .jpg here
+          <br />
+          <span className="opacity-70">or click to browse</span>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept=".glb,.gltf,.obj,.png,.jpg,.jpeg,.webp,.gif,model/gltf-binary,model/gltf+json"
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files?.length) ingest(e.target.files)
+            // Clear so re-selecting the same file fires onChange again.
+            e.target.value = ''
+          }}
+        />
+        {assets.length > 0 && (
+          <div className="grid grid-cols-2 gap-1 mt-1">
+            {assets.map((a) => (
+              <div
+                key={a.id}
+                className="border border-nasa-border bg-black/40 hover:bg-nasa-border/30 hover:border-nasa-accent transition px-2 py-1.5 text-left group relative"
+              >
+                <button
+                  onClick={() => {
+                    spawn('custom', { customAssetId: a.id, label: a.name })
+                  }}
+                  className="w-full text-left"
+                  title={`Spawn ${a.name}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-nasa-warn text-base">{a.emoji}</span>
+                    <span className="text-nasa-accent text-[11px] truncate">
+                      {a.name}
+                    </span>
+                  </div>
+                  <div className="text-nasa-dim text-[10px] mt-0.5 uppercase">
+                    {a.kind} · r={a.defaultRadius}m
+                  </div>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    customAssets.remove(a.id)
+                  }}
+                  title="Remove from library"
+                  className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 text-nasa-danger px-1 text-[10px] hover:underline"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
           </div>
+        )}
+      </div>
+      <div className="mt-2 pt-2 border-t border-nasa-border">
+        <div className="panel-title text-[10px] mb-1">[ SAVE / LOAD ]</div>
+        <div className="grid grid-cols-3 gap-1">
+          <button
+            onClick={handleExport}
+            title="Download current scene as a .sim file"
+            className="border border-nasa-border hover:border-nasa-accent hover:bg-nasa-border/30 text-nasa-text px-1 py-1 text-[10px] transition"
+          >
+            ⇣ EXPORT
+          </button>
+          <button
+            onClick={handleImport}
+            title="Load a .sim / .json file from disk"
+            className="border border-nasa-border hover:border-nasa-accent hover:bg-nasa-border/30 text-nasa-text px-1 py-1 text-[10px] transition"
+          >
+            ⇡ IMPORT
+          </button>
+          <button
+            onClick={handleShare}
+            title="Copy a shareable URL with the whole scene encoded in the hash"
+            className="border border-nasa-border hover:border-nasa-accent hover:bg-nasa-border/30 text-nasa-text px-1 py-1 text-[10px] transition"
+          >
+            ⌁ SHARE
+          </button>
         </div>
-        <div className="flex items-center border-t border-nasa-border pt-1 mt-1">
-          <span className="text-nasa-accent mr-1">gravsim&gt;</span>
-          <input
-            disabled
-            placeholder="commands enabled in milestone 10"
-            className="flex-1 bg-transparent outline-none text-nasa-text placeholder:text-nasa-dim disabled:cursor-not-allowed"
-          />
-        </div>
+        {status && (
+          <div
+            className={
+              'mt-1 text-[10px] ' +
+              (status.kind === 'ok' ? 'text-nasa-accent' : 'text-nasa-danger')
+            }
+          >
+            {status.kind === 'ok' ? '✓ ' : '✗ '}
+            {status.text}
+          </div>
+        )}
+      </div>
+      <div className="text-nasa-dim text-[10px] mt-2 italic">
+        {'// autosave runs in background · terminal: `save <name>` / `load -`'}
       </div>
     </Panel>
   )
 }
+
+export { TelemetryPanel } from './TelemetryPanel'
+
+export { TimelinePanel } from './TimelinePanel'
+
+export { TerminalPanel } from './TerminalPanel'
+
+const kindColor = (k: SimEvent['kind']) =>
+  k === 'IMPACT'
+    ? 'text-nasa-warn'
+    : k === 'ERROR'
+      ? 'text-nasa-danger'
+      : k === 'SCENE'
+        ? 'text-nasa-accent'
+        : k === 'WORLD'
+          ? 'text-nasa-accent'
+          : k === 'PHYSICS'
+            ? 'text-nasa-warn'
+            : 'text-nasa-text'
 
 export function EventLogPanel() {
-  const bodies = useSim((s) => s.bodies)
+  // useSyncExternalStore — re-renders only when events fire.
+  // events.snapshot() returns a stable array reference.
+  const list = useSyncExternalStore(
+    events.subscribe,
+    () => events.snapshot(),
+  )
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  // Auto-scroll to newest. Run as an effect tied to list length so we only
+  // snap when new lines arrive — not on every parent re-render.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [list.length])
+
   return (
-    <Panel>
-      <div className="space-y-0.5 text-[11px] font-mono">
-        <div>
-          <span className="text-nasa-dim">[T+00:00:00.000]</span>{' '}
-          <span className="text-nasa-accent">SYSTEM</span> gravsim boot complete
+    <Panel scroll={false}>
+      <div className="h-full flex flex-col">
+        <div className="flex justify-between items-center mb-1 text-[10px]">
+          <span className="text-nasa-dim">{list.length} events</span>
+          <button
+            onClick={() => events.clear()}
+            className="text-nasa-danger hover:underline"
+          >
+            [ CLEAR ]
+          </button>
         </div>
-        <div>
-          <span className="text-nasa-dim">[T+00:00:00.020]</span>{' '}
-          <span className="text-nasa-warn">PHYSICS</span> rapier wasm online
+        <div ref={scrollRef} className="flex-1 min-h-0 overflow-auto space-y-0.5 text-[11px] font-mono pr-1">
+          {list.length === 0 && <Stub label="event log empty" />}
+          {list.map((e) => (
+            <div key={e.id} className="whitespace-pre-wrap break-words">
+              <span className="text-nasa-dim">[{formatMissionClock(e.t)}]</span>{' '}
+              <span className={kindColor(e.kind)}>{e.kind}</span>{' '}
+              <span className="text-nasa-text">{e.text}</span>
+            </div>
+          ))}
         </div>
-        <div>
-          <span className="text-nasa-dim">[T+00:00:00.140]</span>{' '}
-          <span className="text-nasa-accent">SCENE</span> seeded with {bodies.length} bodies
-        </div>
-        <Stub label="impact / collision / error events (milestone 13)" />
       </div>
     </Panel>
   )

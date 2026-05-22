@@ -3,15 +3,25 @@
 @tailwind utilities;
 
 :root {
-  --nasa-bg: #000000;
-  --nasa-panel: #0a0e0a;
-  --nasa-border: #1a3a1a;
-  --nasa-text: #b8ffb8;
-  --nasa-accent: #00ff66;
-  --nasa-warn: #ffb800;
-  --nasa-danger: #ff3030;
-  --nasa-grid: #0f1f0f;
-  --nasa-dim: #3a6a3a;
+  --nasa-bg: #1e1e1e;
+  --nasa-bg-rgb: 30, 30, 30;
+  --nasa-panel: #252526;
+  --nasa-panel-rgb: 37, 37, 38;
+  --nasa-border: #3e3e42;
+  --nasa-border-rgb: 62, 62, 66;
+  --nasa-text: #e8e8e8;
+  --nasa-text-rgb: 232, 232, 232;
+  --nasa-accent: #007acc;
+  --nasa-accent-rgb: 0, 122, 204;
+  --nasa-warn: #dcdcaa;
+  --nasa-warn-rgb: 220, 220, 170;
+  --nasa-danger: #f48771;
+  --nasa-danger-rgb: 244, 135, 113;
+  --nasa-grid: #2d2d30;
+  --nasa-grid-rgb: 45, 45, 48;
+  --nasa-dim: #6a6a6a;
+  --nasa-dim-rgb: 106, 106, 106;
+  --terminal-error: #ff3b30;
   color-scheme: dark;
 }
 
@@ -49,7 +59,7 @@ body,
 }
 
 .phosphor-glow {
-  text-shadow: 0 0 6px rgba(0, 255, 102, 0.55);
+  text-shadow: 0 0 6px rgba(var(--nasa-accent-rgb), 0.55);
 }
 
 .panel-title {
@@ -76,7 +86,7 @@ body,
   background: var(--nasa-accent);
   border: 0;
   cursor: pointer;
-  box-shadow: 0 0 6px rgba(0, 255, 102, 0.55);
+  box-shadow: 0 0 6px rgba(var(--nasa-accent-rgb), 0.55);
 }
 .nasa-range::-moz-range-thumb {
   width: 10px;
@@ -84,7 +94,7 @@ body,
   background: var(--nasa-accent);
   border: 0;
   cursor: pointer;
-  box-shadow: 0 0 6px rgba(0, 255, 102, 0.55);
+  box-shadow: 0 0 6px rgba(var(--nasa-accent-rgb), 0.55);
 }
 
 input[type='color'] {
@@ -108,7 +118,7 @@ input[type='color']::-webkit-color-swatch {
     to bottom,
     rgba(0, 0, 0, 0) 0,
     rgba(0, 0, 0, 0) 2px,
-    rgba(0, 255, 102, 0.025) 3px,
+    rgba(var(--nasa-accent-rgb), 0.025) 3px,
     rgba(0, 0, 0, 0) 4px
   );
   z-index: 9999;
